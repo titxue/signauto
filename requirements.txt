@@ -1,0 +1,4 @@
+requests==2.25.1
+APScheduler==3.6.3
+pycryptodome==3.9.9
+pyDes==2.0.1
