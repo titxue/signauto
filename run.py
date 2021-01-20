@@ -17,6 +17,9 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 class DailyCP:
     def __init__(self, schoolName="学校名称"):
+        self.longitude = 111,
+        self.latitude = 11,
+        self.temperature = "36.3"
         self.key = "b3L26XNL"  # dynamic when app update
         self.session = requests.session()
         self.host = "hnchxy.campusphere.net"
@@ -209,8 +212,8 @@ class DailyCP:
         # 113.863019,34.793585
         data = {
             #定位地址经纬度
-            "longitude":111 ,
-            "latitude": 11 ,
+            "longitude":self.longitude,
+            "latitude": self.latitude,
             
             "isMalposition": 1,
             "abnormalReason": "",
@@ -225,7 +228,7 @@ class DailyCP:
                     "extraFieldItemWid": str(extraFieldItemWids[0])
                 },
                 {
-                    "extraFieldItemValue": "36.5",
+                    "extraFieldItemValue": self.temperature,
                     "extraFieldItemWid": str(extraFieldItemWids[1])
                 },
                 {
