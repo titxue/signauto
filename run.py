@@ -209,12 +209,12 @@ class DailyCP:
         ret = self.signed(form["datas"]["signInstanceWid"], extraFieldItemWids,form['datas']['signedStuInfo']['userName'])
         return ret
     def send_wechat(self,title,content): 
-        sckey = "SCU55919T6c37b4f2a3173a03563b7a3a9fe39a0a5f5dc7ddb7484" # your key
+        sckey = "**************" # your key
         url = 'https://sc.ftqq.com/' + sckey + '.send'
         data = {'text':title,'desp':content}
         result = requests.post(url,data)
         return(result)
-        
+
     def signed(self, signInstanceWid, extraFieldItemWids, user):
         try:
             data = {
