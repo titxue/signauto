@@ -11,20 +11,25 @@ import sys
 import os
 import hashlib
 import csv
+import logging
 from Crypto.Cipher import AES
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 
 class DailyCP:
-    def __init__(self, schoolName="学校名称"):
-        self.longitude = 111,
-        self.latitude = 11,
-        self.temperature = "36.3"
+    def __init__(self, schoolName="****"):
+
+        # 坐标
+        self.longitude = "*******"
+        self.latitude = "None"
+
+        self.temperature = 36.3
+
         self.key = "b3L26XNL"  # dynamic when app update
         self.session = requests.session()
-        self.host = "hnchxy.campusphere.net"
-        self.loginUrl = "学校登录地址url"
-        self.isIAPLogin = True
+        self.host = None #url可以直接指定 None or url
+        self.loginUrl = None  #url可以直接指定 None or url
+        self.isIAPLogin = True 
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 Edg/83.0.478.37",
             # "X-Requested-With": "XMLHttpRequest",
@@ -37,8 +42,15 @@ class DailyCP:
                      "appVersion": "8.1.13", "model": "黑洞量子计算机", "lon": 0.0, "systemVersion": "第一代", "lat": 0.0}
         self.session.headers.update(
             {"Cpdaily-Extension": self.encrypt(json.dumps(extension))})
-        self.setHostBySchoolName(schoolName)
+        
+        if self.host == None:
+            self.setHostBySchoolName(schoolName)
+        elif self.loginUrl == None:
+            self.setHostBySchoolName(schoolName)
+        else:
+            pass
 
+    
     def setHostBySchoolName(self, schoolName):
         ret = self.request(
             "https://static.campushoy.com/apicache/tenantListSort")
@@ -80,11 +92,13 @@ class DailyCP:
             self.session.headers.update({"Referer": Referer})
         if body == None:
             ret = self.session.get(url)
+            # ret.content.decode("utf-8")
         else:
             self.session.headers.update(
                 {"Content-Type": ("application/json" if JsonBody else "application/x-www-form-urlencoded")})
             ret = self.session.post(url, data=(
                 json.dumps(body) if JsonBody else body))
+            # ret.content.decode("utf-8")
         if parseJson:
             return json.loads(ret.text)
         else:
@@ -120,7 +134,6 @@ class DailyCP:
         ret = self.request("https://{host}/iap/security/lt",
                            "lt={client}".format(client=client), True, False)
         client = ret["result"]["_lt"]
-        # self.encryptSalt = ret["result"]["_encryptSalt"]
 
         body = {
             "username": username,
@@ -134,7 +147,6 @@ class DailyCP:
         ret = self.request("https://{host}/iap/doLogin", body, True, False)
         if ret["resultCode"] == "REDIRECT":
             self.session.get(ret["url"])
-            # print(ret["url"])
             return True
         else:
             return False
@@ -142,7 +154,6 @@ class DailyCP:
     def checkNeedCaptchaAuthServer(self, username):
         ret = self.request("http://{host}/authserver/needCaptcha.html?username={username}&pwdEncrypt2=pwdEncryptSalt".format(
             username=username), parseJson=False).text
-        # print(ret)
         return ret == "true"
 
     def loginAuthserver(self, username, password, captcha=""):
@@ -166,12 +177,10 @@ class DailyCP:
 
     def getStuSignIn(self):
         body = {
-            # "pageSize": 10,
-            # "pageNumber": 1
+
         }
         ret = self.request(
             "https://{host}/wec-counselor-sign-apps/stu/sign/getStuSignInfosInOneDay", body)
-        # print(ret["datas"])
         return ret["datas"]
 
     def SigninForm(self, wid, signInstanceWid):
@@ -185,123 +194,150 @@ class DailyCP:
 
     def autoComplete(self):
         collectList = self.getStuSignIn()
-        # print(collectList)
         if collectList["unSignedTasks"]:
             item = collectList["unSignedTasks"][0]
         else:
             item = collectList["signedTasks"][0]
 
         form = self.SigninForm(item["signWid"], item["signInstanceWid"])
-        # username =
         extraFieldItems = form['datas']["extraField"]
         extraFieldItemWids = []
         for extraFieldItem in extraFieldItems:
-            # print(extraFieldItem["extraFieldItems"])
             for item in extraFieldItem["extraFieldItems"]:
                 if item["content"] == "否" or item["content"] == "其它":
                     extraFieldItemWids.append(item["wid"])
-
-
-
-        
-        
-
-        self.signed(form["datas"]["signInstanceWid"], extraFieldItemWids,form['datas']['signedStuInfo']['userName'])
-
-    def signed(self, signInstanceWid, extraFieldItemWids,user):
-        # 113.863019,34.793585
+        ret = self.signed(form["datas"]["signInstanceWid"], extraFieldItemWids,form['datas']['signedStuInfo']['userName'])
+        return ret
+    def send_wechat(self,title,content):
+        # 标题和内容必须为字符串。
+        sckey = "*******" # 你的key
+        url = 'https://sc.ftqq.com/' + sckey + '.send'
         data = {
-            #定位地址经纬度
-            "longitude":self.longitude,
-            "latitude": self.latitude,
-            
-            "isMalposition": 1,
-            "abnormalReason": "",
-            "signPhotoUrl": "",
-            "isNeedExtra": 1,
-            "position": "签到地点",
-            "uaIsCpadaily": True,
-            "signInstanceWid": str(signInstanceWid),
-            "extraFieldItems": [
-                {
-                    "extraFieldItemValue": "否",
-                    "extraFieldItemWid": str(extraFieldItemWids[0])
-                },
-                {
-                    "extraFieldItemValue": self.temperature,
-                    "extraFieldItemWid": str(extraFieldItemWids[1])
-                },
-                {
-                    "extraFieldItemValue": "否",
-                    "extraFieldItemWid": str(extraFieldItemWids[2])
-                },
-                {
-                    "extraFieldItemValue": "否",
-                    "extraFieldItemWid": str(extraFieldItemWids[3])
-                }
-            ]
+            'text':title,
+            'desp':content
         }
+        result = self.request(url=url,body=data,parseJson=False)
+        return(result)
+    def signed(self, signInstanceWid, extraFieldItemWids, user):
+        try:
+            data = {
+                "longitude": self.longitude,
+                "latitude": self.latitude,
+                "isMalposition": 1,
+                "abnormalReason": "",
+                "signPhotoUrl": "",
+                "isNeedExtra": 1,
+                "position": "光之国",
+                "uaIsCpadaily": True,
+                "signInstanceWid": str(signInstanceWid),
+                "extraFieldItems": [
+                    {
+                        "extraFieldItemValue": "否",
+                        "extraFieldItemWid": str(extraFieldItemWids[0])
+                    },
+                    {
+                        "extraFieldItemValue": self.temperature,
+                        "extraFieldItemWid": str(extraFieldItemWids[1])
+                    },
+                    {
+                        "extraFieldItemValue": "否",
+                        "extraFieldItemWid": str(extraFieldItemWids[2])
+                    },
+                    {
+                        "extraFieldItemValue": "否",
+                        "extraFieldItemWid": str(extraFieldItemWids[3])
+                    }
+                ]
+            }
 
-        signurl = "https://{学校地址}/wec-counselor-sign-apps/stu/sign/submitSign"
-        res = self.request(url=signurl, body=data)
-        print("谁在签到：" + user )    
+            signurl = "https://{host}/wec-counselor-sign-apps/stu/sign/submitSign"
+            res = self.request(url=signurl, body=data)
+
+
+            if res["message"]=="SUCCESS":
+                self.send_wechat("签到成功","用户信息："+user+"|返回信息："+ str(res))
+                ret = "用户："+user+"-签到成功"
+                return ret
+            else:
+                self.send_wechat("签到失败","用户信息："+user+"|返回信息："+ str(res))
+                ret = "用户："+user+"-签到失败，返回数据："+str(res)
+                return ret
+        except KeyError:
+            pass
+
+class Start:
+    def __init__(self):
+        # 日志
+        dateFormat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        # 全局配置
+        # logging.basicConfig(level = logging.INFO,format =dateFormat )
+        self.log = logging.getLogger(__name__)
+        self.log.setLevel(level=logging.DEBUG)
+        formatter = logging.Formatter(dateFormat)
+
+
+
+        # 输出到控制台，不设置format
+        handler_stream = logging.StreamHandler(sys.stdout)
+        handler_stream.setFormatter(formatter)
+        handler_stream.setLevel(level=logging.DEBUG) # 更改INFO
+        self.log.addHandler(handler_stream)
+
+        # 输出到文件
+        handler_file = logging.FileHandler('log.log')
+        handler_file.setFormatter(formatter)
+        self.log.addHandler(handler_file)
+
+
+
+
+    def readUser(self):
+        # 读取配置文件
+        username = []
+        with open("config.csv")as f:
+            f_csv = csv.reader(f)
+            next(f_csv)
+            for row in f_csv:
+                username.append(row)
+                
+        return username
+
+
+    def run(self):
+        users = self.readUser()
+        apps = []
+        logdata = []
+        for _ in range(len(users)):
+            apps.append(DailyCP())
+
+        for (app, user) in zip(apps, users):
+            app.login(user[0], user[1])
+            logdata.append(app.autoComplete())
         
-        if res["message"] == "SUCCESS":
-            print("签到成功")
-        else:
-            print(res["message"])
-            self.request(url = "server酱key ?text=【用户：{}】签到失败&desp={}".format(user,res["message"]))
-            return 
-        
-            # print(res["datas"]) #返回数据
-        if "SUCCESS" in res:
-            print("[+] " + str([signInstanceWid, extraFieldItemWids]))
-            self.request(url = "server酱key ?text=【用户：{}】签到成功&desp={}".format(user,res["message"]))
-        else:
-            print(str([signInstanceWid, extraFieldItemWids]))
-            
+        # 打印
+        for i in logdata:
+            self.log.info(i)
 
-def readUser():
-    # 读取配置文件
-    username = []
-    with open("config.csv")as f:
-        f_csv = csv.reader(f)
-        next(f_csv)
-        for row in f_csv:
-            username.append(row)
-    return username
 
-def run():
-    users = readUser()
-    apps = []
-    for _ in range(len(users)):
-        apps.append(DailyCP())
-    
-    for (app,user) in zip(apps,users):
-        app.login(user[0],user[1])
-        app.autoComplete()
-
-def runTime(hour=0, minute=10):
+    def runTime(self,hour=0, minute=10,second=10):
         # 定时运行
-        print("您开启了每日{}时{}分的定时器。".format(hour,minute))
+        self.log.warning("您开启了每日{}时{}分{}秒的定时器。".format(hour, minute,second))
         scheduler = BlockingScheduler()
-        scheduler.add_job(run, 'cron', hour=hour,minute=minute)
+        scheduler.add_job(self.run, 'cron', hour=hour, minute=minute,second=second)
         try:
             scheduler.start()
-        except (KeyboardInterrupt,SystemExit):
+        except Exception:
             pass
 
 
-
-
 if __name__ == "__main__":
-    run()
-    # runTime(0,6)
-
-
+    app = Start()
+    app.run()
+    # app.runTime(0,5,0)
 
 
 # 更新日志
+# 2021/1/25 增加日志功能
 # 2021/1/17 优化提提示内容，添加server酱微信通知，修复签到失败bug
 # 2021/1/16 增加批量登录，增加定时器。
 # 2021/1/15 浪费别人的时间是一种可耻的行为。
